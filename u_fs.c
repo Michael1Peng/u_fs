@@ -8,5 +8,35 @@
 #include <stddef.h>
 #include <assert.h>
 #include "u_fs_structs.h"
+#include "disk_operation.h"
 
-u_fs_getattr
+
+static int u_fs_getattr(const char *path, struct stat *stbuf,
+                        struct fuse_file_info *fi) {
+    (void) fi;
+
+    memset(stbuf, 0, sizeof(struct stat));
+    char directoryname[MAX_FILENAME+1];
+    char filename[MAX_FILENAME+1];
+    char extension[MAX_EXTENSION+1];
+    memset(directoryname,  0,MAX_FILENAME  + 1);
+    memset(filename, 0,MAX_FILENAME  + 1);
+    memset(extension,0,MAX_EXTENSION + 1);
+
+    if (strcmp(path, "/") == 0) {
+        stbuf->st_mode = S_IFDIR | 0755;
+        stbuf->st_nlink = 2;
+        return 0;
+    } else {
+        sscanf(path,"/%[^/]/%[^.].%s",directoryname,filename,extension);
+
+    }
+}
+
+static struct fuse_operations u_fs_operations = {
+        .getattr
+};
+
+int main(int argc, char *argv[]) {
+    return fuse_main(argc, argv, &u_fs_operations, NULL);
+}
