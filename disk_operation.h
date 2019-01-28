@@ -11,7 +11,7 @@
 #include "u_fs_structs.h"
 
 static int u_fs_find_directory(char *directoryname) {
-    FILE *disk = fopen("disk", "rb");
+    FILE *disk = fopen(".disk", "rb");
     if (disk==NULL){
         printf("fail to open disk.\n");
         return -1;
