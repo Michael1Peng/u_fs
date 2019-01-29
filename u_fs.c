@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <stddef.h>
 #include <assert.h>
+#include <stdlib.h>
 #include "u_fs_structs.h"
 #include "disk_operation.h"
 
