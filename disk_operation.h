@@ -1,7 +1,7 @@
 #ifndef disk_operation_H
 #define disk_operation_H
 
-static int u_fs_find_directory(char *directoryname) {
+static long u_fs_find_directory(char *directoryname) {
     FILE *disk = fopen(".disk", "rb");
     if (disk == NULL) {
         printf("fail to open disk.\n");
@@ -17,20 +17,62 @@ static int u_fs_find_directory(char *directoryname) {
     }
 
     fseek(disk, sb->first_blk * BLOCK_SIZE, SEEK_SET);
+    struct Root_directory *root_directory;
+    fread((void *) root_directory, sizeof(struct Root_directory), 1, SEEK_SET);
+    for (int i = 0; i < MAX_DIRS_IN_ROOT; i++) {
+        if (strcmp(directoryname, root_directory->directories[i].directory_name) == 0) {
+            fclose(disk);
+            return root_directory->directories[i].nStartBlock;
+        }
+    }
+    while (root_directory->nNextBlock != 0) {
+        fseek(disk, root_directory->nNextBlock * BLOCK_SIZE, SEEK_SET);
+        fread((void *) root_directory, sizeof(struct Root_directory), 1, SEEK_SET);
+        for (int i = 0; i < MAX_DIRS_IN_ROOT; i++) {
+            if (strcmp(directoryname, root_directory->directories[i].directory_name) == 0) {
+                fclose(disk);
+                return root_directory->directories[i].nStartBlock;
+            }
+        }
+    }
+    fclose(disk);
+    return 0;
+}
+
+static long u_fs_find_file(long directory_pos, char *filename) {
+    FILE *disk = fopen(".disk", "rb");
+    if (disk == NULL) {
+        printf("fail to open disk.\n");
+        return -1;
+    }
+
+    fseek(disk, directory_pos * BLOCK_SIZE, SEEK_SET);
     struct u_fs_File_directory *u_fs_file_directory;
     fread((void *) u_fs_file_directory, sizeof(struct u_fs_File_directory), 1, disk);
-
     fseek(disk, u_fs_file_directory->nStartBlock * BLOCK_SIZE, SEEK_SET);
-    struct u_fs_Disk_block *u_fs_disk_block;
-    fread((void *) u_fs_disk_block, sizeof(struct u_fs_Disk_block), 1, disk);
-    char string_number[2];
-    strncpy(string_number, u_fs_disk_block->data, 2);
-    int number = atoi(string_number);
-    char data[16];
-    for (int i = 0; i < number; i++) {
-        strncpy(data, u_fs_disk_block->data + 2 + i * 16, 16);
-        struct Root_directory_data *root_directory_data=Root_directory_data_new(data);
+    struct Directory_entry *directory_entry;
+    fread((void *) directory_entry, sizeof(struct Directory_entry), 1, SEEK_SET);
+
+    for (int i = 0; i < MAX_FILES_IN_DIRECTORY; ++i) {
+        if (strcmp(filename, directory_entry->u_fs_file_directory_list[i].fname) == 0) {
+            fclose(disk);
+            return directory_entry->u_fs_file_directory_list[i].nStartBlock;
+        }
     }
+
+    while (directory_entry->nNextBlock != 0) {
+        fseek(disk, directory_entry->nNextBlock * BLOCK_SIZE, SEEK_SET);
+        fread((void *) directory_entry, sizeof(struct Directory_entry), 1, SEEK_SET);
+        for (int i = 0; i < MAX_FILES_IN_DIRECTORY; ++i) {
+            if (strcmp(filename, directory_entry->u_fs_file_directory_list[i].fname) == 0) {
+                fclose(disk);
+                return directory_entry->u_fs_file_directory_list[i].nStartBlock;
+            }
+        }
+    }
+
+    fclose(disk);
+    return 0;
 }
 
 #endif
