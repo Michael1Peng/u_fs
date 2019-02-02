@@ -3,4 +3,4 @@ project(u_fs_)
 
 set(CMAKE_CXX_STANDARD 14)
 
-add_executable(u_fs_ u_fs.c)
+add_executable(u_fs_ test_read_and_write_file.c)
