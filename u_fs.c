@@ -1,3 +1,9 @@
+/** @file
+ * Compile with:
+ *
+ *     gcc -Wall u_fs.c `pkg-config fuse3 --cflags --libs` -o u_fs
+ */
+
 #define FUSE_USE_VERSION 31
 
 #include "fuse.h"
@@ -73,30 +79,17 @@ static int u_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
         filler(buf, ".", NULL, 0, 0);
         filler(buf, "..", NULL, 0, 0);
 
-        FILE *disk = fopen(".disk", "rb+");
-        if (disk == NULL) {
-            printf("fail to open disk.\n");
-            return -1;
-        }
-
         struct Sb sb;
 
-        int read_disk = (int) fread((void *) &sb, sizeof(struct Sb), 1, disk);
-        if (read_disk <= 0) {
-            printf("fail to read the sb.\n");
-            return -1;
-        }
-        fseek(disk, sb.first_blk * BLOCK_SIZE, SEEK_SET);
+        get_sb(0, &sb);
         struct Root_directory root_directory;
-        fread((void *) &root_directory, sizeof(struct Root_directory), 1, disk);
+        get_root_directory(sb.first_blk, &root_directory);
         for (int i = 0; i < MAX_DIRS_IN_ROOT; i++) {
             if (strcmp(root_directory.directories[i].directory_name, "") != 0)
                 filler(buf, root_directory.directories[i].directory_name, NULL, 0, 0);
         }
-        fclose(disk);
         while (root_directory.nNextBlock != 0) {
-            fseek(disk, root_directory.nNextBlock * BLOCK_SIZE, SEEK_SET);
-            fread((void *) &root_directory, sizeof(struct Root_directory), 1, disk);
+            get_root_directory(root_directory.nNextBlock, &root_directory);
             for (int i = 0; i < MAX_DIRS_IN_ROOT; i++) {
                 if (strcmp(root_directory.directories[i].directory_name, "") != 0)
                     filler(buf, root_directory.directories[i].directory_name, NULL, 0, 0);
@@ -110,18 +103,10 @@ static int u_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
         return -ENOENT;
     }
 
-    FILE *disk = fopen(".disk", "rb+");
-    if (disk == NULL) {
-        printf("fail to open disk.\n");
-        return -1;
-    }
-
-    fseek(disk, location_directory * BLOCK_SIZE, SEEK_SET);
     struct u_fs_File_directory u_fs_file_directory;
-    fread((void *) &u_fs_file_directory, sizeof(struct u_fs_File_directory), 1, disk);
-    fseek(disk, u_fs_file_directory.nStartBlock * BLOCK_SIZE, SEEK_SET);
+    get_u_fs_file_directory(location_directory, &u_fs_file_directory);
     struct Directory_entry directory_entry;
-    fread((void *) &directory_entry, sizeof(struct Directory_entry), 1, disk);
+    get_directory_entry(u_fs_file_directory.nStartBlock, &directory_entry);
 
     for (int i = 0; i < MAX_FILES_IN_DIRECTORY; ++i) {
         if (strcmp(directory_entry.u_fs_file_directory_list[i].fname, "") == 0) {
@@ -130,8 +115,7 @@ static int u_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     }
 
     while (directory_entry.nNextBlock != 0) {
-        fseek(disk, directory_entry.nNextBlock * BLOCK_SIZE, SEEK_SET);
-        fread((void *) &directory_entry, sizeof(struct Directory_entry), 1, disk);
+        get_directory_entry(directory_entry.nNextBlock, &directory_entry);
         for (int i = 0; i < MAX_FILES_IN_DIRECTORY; ++i) {
             if (strcmp(directory_entry.u_fs_file_directory_list[i].fname, "") == 0) {
                 filler(buf, directory_entry.u_fs_file_directory_list[i].fname, NULL, 0, 0);
@@ -139,7 +123,6 @@ static int u_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
         }
     }
 
-    fclose(disk);
     return 0;
 }
 
@@ -166,33 +149,44 @@ static int u_fs_read(const char *path, char *buf, size_t size, off_t offset,
         return -ENOENT;
     }
 
-    FILE *disk = fopen(".disk", "rb+");
-    if (disk == NULL) {
-        printf("fail to open disk.\n");
-        return -1;
-    }
-
-    fseek(disk, location_file * BLOCK_SIZE, SEEK_SET);
     struct u_fs_File_directory u_fs_file_directory;
-    fread((void *) &u_fs_file_directory, sizeof(struct u_fs_File_directory), 1, disk);
+    get_u_fs_file_directory(location_file, &u_fs_file_directory);
 
     if (offset > u_fs_file_directory.fsize) {
         return -EFBIG;
     }
 
-    fseek(disk, u_fs_file_directory.nStartBlock * BLOCK_SIZE, SEEK_SET);
     struct u_fs_Disk_block u_fs_disk_block;
-    fread((void *) &u_fs_disk_block, sizeof(struct u_fs_Disk_block), 1, disk);
+    get_u_fs_disk_block(u_fs_file_directory.nStartBlock, &u_fs_disk_block);
 
-    while (offset >= MAX_DATA_IN_BLOCK) {
-        offset -= MAX_DATA_IN_BLOCK;
-
+    int offset_remainder = (int) offset;
+    while (offset_remainder >= MAX_DATA_IN_BLOCK) {
+        offset_remainder -= MAX_DATA_IN_BLOCK;
+        if (get_u_fs_disk_block(u_fs_disk_block.nNextBlock, &u_fs_disk_block)) {
+            continue;
+        } else {
+            printf("The offset is out of range.\n");
+            return -1;
+        }
     }
+
+    int i;
+    for (i = 0; i < size; i++) {
+        if ((i + offset_remainder) % MAX_DATA_IN_BLOCK == 0 && i != 0) {
+            get_u_fs_disk_block(u_fs_disk_block.nNextBlock, &u_fs_disk_block);
+        }
+        if (i + offset > u_fs_file_directory.fsize) {
+            break;
+        }
+        buf[i] = u_fs_disk_block.data[(i + offset_remainder) % MAX_DATA_IN_BLOCK];
+    }
+    return i;
 }
 
 static struct fuse_operations u_fs_operations = {
         .getattr=u_fs_getattr,
         .readdir=u_fs_readdir,
+        .read=u_fs_read,
 };
 
 int main(int argc, char *argv[]) {
