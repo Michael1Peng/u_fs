@@ -17,7 +17,6 @@
 #include "u_fs_structs.h"
 #include "disk_operation.h"
 
-
 static int u_fs_getattr(const char *path, struct stat *stbuf,
                         struct fuse_file_info *fi) {
     (void) fi;
@@ -83,7 +82,9 @@ static int u_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
         get_sb(0, &sb);
         struct Root_directory root_directory;
-        get_root_directory(sb.first_blk, &root_directory);
+        if (!get_root_directory(sb.first_blk, &root_directory)){
+            return -ENOENT;
+        }
         for (int i = 0; i < MAX_DIRS_IN_ROOT; i++) {
             if (strcmp(root_directory.directories[i].directory_name, "") != 0)
                 filler(buf, root_directory.directories[i].directory_name, NULL, 0, 0);
@@ -122,8 +123,8 @@ static int u_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
             }
         }
     }
-
     return 0;
+
 }
 
 static int u_fs_read(const char *path, char *buf, size_t size, off_t offset,
@@ -190,5 +191,5 @@ static struct fuse_operations u_fs_operations = {
 };
 
 int main(int argc, char *argv[]) {
-    return fuse_main(argc, argv, &u_fs_operations, NULL);
+    struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
 }

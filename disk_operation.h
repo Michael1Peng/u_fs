@@ -2,12 +2,13 @@
 #define disk_operation_H
 
 static long u_fs_find_directory(char *directoryname) {
-    FILE *disk = fopen(".disk", "rb+");
+    FILE *disk = fopen("/data/.disk", "rb+");
     if (disk == NULL) {
         printf("fail to open disk.\n");
         return -1;
     }
 
+    printf("Open disk.\n");
     struct Sb sb;
 
     int read_disk = (int) fread((void *) &sb, sizeof(struct Sb), 1, disk);
@@ -39,7 +40,7 @@ static long u_fs_find_directory(char *directoryname) {
 }
 
 static long u_fs_find_file(long directory_pos, char *filename) {
-    FILE *disk = fopen(".disk", "rb");
+    FILE *disk = fopen("/data/.disk", "rb");
     if (disk == NULL) {
         printf("fail to open disk.\n");
         return -1;
@@ -75,7 +76,7 @@ static long u_fs_find_file(long directory_pos, char *filename) {
 }
 
 int get_sb(long location_sb, struct Sb *sb_receiver) {
-    FILE *disk = fopen(".disk", "rb+");
+    FILE *disk = fopen("/data/.disk", "rb+");
     if (disk == NULL) {
         printf("fail to open disk.\n");
         return -1;
@@ -88,7 +89,7 @@ int get_sb(long location_sb, struct Sb *sb_receiver) {
 }
 
 int get_bitmap(long location_bitmap, char bitmap_receiver[BLOCK_SIZE]) {
-    FILE *disk = fopen(".disk", "rb+");
+    FILE *disk = fopen("/data/.disk", "rb+");
     if (disk == NULL) {
         printf("fail to open disk.\n");
         return -1;
@@ -102,7 +103,7 @@ int get_bitmap(long location_bitmap, char bitmap_receiver[BLOCK_SIZE]) {
 }
 
 int get_root_directory(long location_root_directory, struct Root_directory *root_directory_receiver) {
-    FILE *disk = fopen(".disk", "rb+");
+    FILE *disk = fopen("/data/.disk", "rb+");
     if (disk == NULL) {
         printf("fail to open disk.\n");
         return -1;
@@ -116,7 +117,7 @@ int get_root_directory(long location_root_directory, struct Root_directory *root
 }
 
 int get_u_fs_file_directory(long location_u_fs_file_directory, struct u_fs_File_directory *u_fs_file_directory_receiver) {
-    FILE *disk = fopen(".disk", "rb+");
+    FILE *disk = fopen("/data/.disk", "rb+");
     if (disk == NULL) {
         printf("fail to open disk.\n");
         return -1;
@@ -130,7 +131,7 @@ int get_u_fs_file_directory(long location_u_fs_file_directory, struct u_fs_File_
 }
 
 int get_directory_entry(long location_directory_entry, struct Directory_entry *directory_entry_receiver) {
-    FILE *disk = fopen(".disk", "rb+");
+    FILE *disk = fopen("/data/.disk", "rb+");
     if (disk == NULL) {
         printf("fail to open disk.\n");
         return -1;
@@ -144,7 +145,7 @@ int get_directory_entry(long location_directory_entry, struct Directory_entry *d
 }
 
 int get_u_fs_disk_block(long location_u_fs_disk_block, struct u_fs_Disk_block *u_fs_disk_block_receiver) {
-    FILE *disk = fopen(".disk", "rb+");
+    FILE *disk = fopen("/data/.disk", "rb+");
     if (disk == NULL) {
         printf("fail to open disk.\n");
         return -1;
@@ -158,7 +159,7 @@ int get_u_fs_disk_block(long location_u_fs_disk_block, struct u_fs_Disk_block *u
 }
 
 int write_sb(long location_sb, struct Sb *sb) {
-    FILE *disk = fopen(".disk", "rb+");
+    FILE *disk = fopen("/data/.disk", "rb+");
     if (disk == NULL) {
         printf("fail to open disk.\n");
         return -1;
@@ -171,7 +172,7 @@ int write_sb(long location_sb, struct Sb *sb) {
 }
 
 int write_bitmap(long location_bitmap, char bitmap[BLOCK_SIZE]) {
-    FILE *disk = fopen(".disk", "rb+");
+    FILE *disk = fopen("/data/.disk", "rb+");
     if (disk == NULL) {
         printf("fail to open disk.\n");
         return -1;
@@ -185,7 +186,7 @@ int write_bitmap(long location_bitmap, char bitmap[BLOCK_SIZE]) {
 }
 
 int write_root_directory(long location_root_directory, struct Root_directory *root_directory) {
-    FILE *disk = fopen(".disk", "rb+");
+    FILE *disk = fopen("/data/.disk", "rb+");
     if (disk == NULL) {
         printf("fail to open disk.\n");
         return -1;
@@ -199,7 +200,7 @@ int write_root_directory(long location_root_directory, struct Root_directory *ro
 }
 
 int write_u_fs_file_directory(long location_u_fs_file_directory, struct u_fs_File_directory *u_fs_file_directory) {
-    FILE *disk = fopen(".disk", "rb+");
+    FILE *disk = fopen("/data/.disk", "rb+");
     if (disk == NULL) {
         printf("fail to open disk.\n");
         return -1;
@@ -213,7 +214,7 @@ int write_u_fs_file_directory(long location_u_fs_file_directory, struct u_fs_Fil
 }
 
 int write_directory_entry(long location_directory_entry, struct Directory_entry *directory_entry) {
-    FILE *disk = fopen(".disk", "rb+");
+    FILE *disk = fopen("/data/.disk", "rb+");
     if (disk == NULL) {
         printf("fail to open disk.\n");
         return -1;
@@ -227,7 +228,7 @@ int write_directory_entry(long location_directory_entry, struct Directory_entry 
 }
 
 int write_u_fs_disk_block(long location_u_fs_disk_block, struct u_fs_Disk_block *u_fs_disk_block) {
-    FILE *disk = fopen(".disk", "rb+");
+    FILE *disk = fopen("/data/.disk", "rb+");
     if (disk == NULL) {
         printf("fail to open disk.\n");
         return -1;
