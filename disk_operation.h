@@ -116,7 +116,8 @@ int get_root_directory(long location_root_directory, struct Root_directory *root
     return 1;
 }
 
-int get_u_fs_file_directory(long location_u_fs_file_directory, struct u_fs_File_directory *u_fs_file_directory_receiver) {
+int
+get_u_fs_file_directory(long location_u_fs_file_directory, struct u_fs_File_directory *u_fs_file_directory_receiver) {
     FILE *disk = fopen("/data/.disk", "rb+");
     if (disk == NULL) {
         printf("fail to open disk.\n");
@@ -240,4 +241,32 @@ int write_u_fs_disk_block(long location_u_fs_disk_block, struct u_fs_Disk_block 
     fclose(disk);
     return 1;
 }
+
+long find_free_block() {
+    FILE *file = fopen("/data/diskimg", "rb+");
+    if (file == NULL) {
+        printf("fail to read the file.\n");
+        return -1;
+    }
+
+    int bitmap_length;
+    fread(&bitmap_length, sizeof(int), 1, file);
+    printf("%d\n", bitmap_length);
+    fseek(file, sizeof(int), SEEK_SET);
+    char bitmap[bitmap_length];
+    fread(bitmap, (size_t) bitmap_length, 1, file);
+    for (int i = 0; i < bitmap_length; ++i) {
+        if (bitmap[i] == '0') {
+            bitmap[i] = '1';
+            fwrite(bitmap, (size_t) bitmap_length, 1, file);
+            fclose(file);
+            return i;
+        }
+    }
+    printf("%s\n", bitmap);
+    printf("There is no free block.\n");
+    fclose(file);
+    return -1;
+}
+
 #endif

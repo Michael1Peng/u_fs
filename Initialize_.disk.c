@@ -14,6 +14,7 @@
 
 void Init() {
 
+//    初始化Super block 和root directory
     FILE *file = fopen("/data/.disk", "w");
     if (file == NULL) {
         printf("fail to read the file.\n");
@@ -28,6 +29,28 @@ void Init() {
     fseek(file, sb->first_blk * BLOCK_SIZE, SEEK_SET);
     fwrite((void *) root_directory, sizeof(struct Root_directory), 1, file);
     fclose(file);
+
+//    初始化bitmap
+    file = fopen("/data/diskimg", "w");
+    if (file == NULL) {
+        printf("fail to read the file.\n");
+        return;
+    }
+    int bitmap_length = 5000000;
+    fwrite(&bitmap_length, sizeof(int), 1, file);
+    fseek(file, sizeof(int), SEEK_SET);
+    char bitmap[bitmap_length];
+    memset(bitmap, '0', bitmap_length);
+    bitmap[0] = '1';
+    bitmap[1] = '1';
+    fwrite(bitmap, (size_t) bitmap_length, 1, file);
+    fclose(file);
+
+    file = fopen("/data/diskimg", "rb+");
+    if (file == NULL) {
+        printf("fail to read the file.\n");
+        return;
+    }
 }
 
 int main(int argc, char *argv[]) {

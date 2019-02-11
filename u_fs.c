@@ -82,18 +82,22 @@ static int u_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
         get_sb(0, &sb);
         struct Root_directory root_directory;
-        if (!get_root_directory(sb.first_blk, &root_directory)){
+        if (!get_root_directory(sb.first_blk, &root_directory)) {
             return -ENOENT;
         }
         for (int i = 0; i < MAX_DIRS_IN_ROOT; i++) {
-            if (strcmp(root_directory.directories[i].directory_name, "") != 0)
+            if (strcmp(root_directory.directories[i].directory_name, "") != 0) {
+                printf("%d\n", i);
                 filler(buf, root_directory.directories[i].directory_name, NULL, 0, 0);
+            }
         }
         while (root_directory.nNextBlock != 0) {
             get_root_directory(root_directory.nNextBlock, &root_directory);
             for (int i = 0; i < MAX_DIRS_IN_ROOT; i++) {
-                if (strcmp(root_directory.directories[i].directory_name, "") != 0)
+                if (strcmp(root_directory.directories[i].directory_name, "") != 0) {
+                    printf("%d\n", i);
                     filler(buf, root_directory.directories[i].directory_name, NULL, 0, 0);
+                }
             }
         }
         return 0;
@@ -126,6 +130,110 @@ static int u_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     return 0;
 
 }
+
+static int u_fs_mkdir(const char *path, mode_t mode) {
+    (void) path;
+    (void) mode;
+
+    char directoryname[2 * (MAX_FILENAME + 1)];
+    char filename[2 * (MAX_FILENAME + 1)];
+    char extension[2 * (MAX_EXTENSION + 1)];
+    memset(directoryname, 0, 2 * (MAX_FILENAME + 1));
+    memset(filename, 0, 2 * (MAX_FILENAME + 1));
+    memset(extension, 0, 2 * (MAX_EXTENSION + 1));
+
+    sscanf(path, "/%[^/]/%[^.].%s", directoryname, filename, extension);
+
+    if (strcmp(filename, "") != 0 || strcmp(extension, "") != 0) {
+        printf("filename or extension is not empty\n");
+        return -ENAMETOOLONG;
+    }
+
+    if (strcmp(directoryname, "") == 0) {
+        printf("The directory name is empty\n");
+        return 1;
+    }
+
+    if (strlen(directoryname) > 8 || strlen(directoryname) < 0) {
+        printf("The length of directory name is incorrect. It should be less than 8 and more than 0.\n");
+    }
+
+    long file_directory_location = find_free_block();
+    long directory_entry_location = find_free_block();
+
+    if (file_directory_location == -1 || directory_entry_location == -1) {
+        printf("There is no free blocks.\n");
+        return -1;
+    }
+
+    struct Sb sb;
+    get_sb(0, &sb);
+
+    struct Root_directory root_directory;
+    if (!get_root_directory(sb.first_blk, &root_directory)) {
+        return -ENOENT;
+    }
+
+    int store_flag = 0;
+
+    for (int i = 0; i < MAX_DIRS_IN_ROOT; i++) {
+        if (strcmp(root_directory.directories[i].directory_name, "") == 0) {
+            root_directory.numbers = root_directory.numbers + 1;
+            strncpy(root_directory.directories[i].directory_name, directoryname, 8);
+            root_directory.directories[i].nStartBlock = file_directory_location;
+            write_root_directory(sb.first_blk, &root_directory);
+            store_flag = 1;
+            break;
+        }
+    }
+
+    long root_directory_location = sb.first_blk;
+    while (root_directory.nNextBlock != 0 && store_flag == 0) {
+        root_directory_location = root_directory.nNextBlock;
+        get_root_directory(root_directory.nNextBlock, &root_directory);
+        for (int i = 0; i < MAX_DIRS_IN_ROOT; i++) {
+            if (strcmp(root_directory.directories[i].directory_name, "") == 0) {
+                root_directory.numbers = root_directory.numbers + 1;
+                strncpy(root_directory.directories[i].directory_name, directoryname, 8);
+                root_directory.directories[i].nStartBlock = file_directory_location;
+                write_root_directory(root_directory_location, &root_directory);
+                store_flag = 1;
+                break;
+            }
+        }
+    }
+
+    if (store_flag == 0) {
+        long root_directory_location_new = find_free_block();
+        if (root_directory_location_new == -1) {
+            printf("There is no free blocks.\n");
+            return -1;
+        }
+
+        root_directory.nNextBlock = root_directory_location_new;
+        write_root_directory(root_directory_location, &root_directory);
+
+        struct Root_directory root_directory_new;
+        root_directory_new.numbers = 1;
+        strncpy(root_directory_new.directories[0].directory_name, directoryname, 8);
+        root_directory_new.directories[0].nStartBlock = file_directory_location;
+        write_root_directory(root_directory_location_new, &root_directory_new);
+    }
+
+    struct u_fs_File_directory u_fs_file_directory;
+    strncpy(u_fs_file_directory.fname, directoryname, 8);
+    u_fs_file_directory.nStartBlock = directory_entry_location;
+    u_fs_file_directory.flag = 2;
+    write_u_fs_file_directory(file_directory_location, &u_fs_file_directory);
+
+    struct Directory_entry directory_entry;
+    directory_entry.numbers = 0;
+    directory_entry.nNextBlock = 0;
+    write_directory_entry(directory_entry_location, &directory_entry);
+
+    return 0;
+}
+
 
 static int u_fs_read(const char *path, char *buf, size_t size, off_t offset,
                      struct fuse_file_info *fi) {
@@ -187,9 +295,10 @@ static int u_fs_read(const char *path, char *buf, size_t size, off_t offset,
 static struct fuse_operations u_fs_operations = {
         .getattr=u_fs_getattr,
         .readdir=u_fs_readdir,
+        .mkdir=u_fs_mkdir,
         .read=u_fs_read,
 };
 
 int main(int argc, char *argv[]) {
-    struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
+    return fuse_main(argc, argv, &u_fs_operations, NULL);
 }
