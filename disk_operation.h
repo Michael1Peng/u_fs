@@ -251,22 +251,39 @@ long find_free_block() {
 
     int bitmap_length;
     fread(&bitmap_length, sizeof(int), 1, file);
-    printf("%d\n", bitmap_length);
     fseek(file, sizeof(int), SEEK_SET);
     char bitmap[bitmap_length];
     fread(bitmap, (size_t) bitmap_length, 1, file);
     for (int i = 0; i < bitmap_length; ++i) {
         if (bitmap[i] == '0') {
             bitmap[i] = '1';
+            fseek(file, sizeof(int), SEEK_SET);
             fwrite(bitmap, (size_t) bitmap_length, 1, file);
             fclose(file);
             return i;
         }
     }
-    printf("%s\n", bitmap);
     printf("There is no free block.\n");
     fclose(file);
     return -1;
+}
+
+void mark_block_free(long block_location) {
+    FILE *file = fopen("/data/diskimg", "rb+");
+    if (file == NULL) {
+        printf("fail to read the file.\n");
+        return;
+    }
+    int bitmap_length;
+    fread(&bitmap_length, sizeof(int), 1, file);
+
+    char bitmap[bitmap_length];
+    fseek(file, sizeof(int), SEEK_SET);
+    fread(bitmap, (size_t) bitmap_length, 1, file);
+    bitmap[block_location] = '0';
+    fseek(file, sizeof(int), SEEK_SET);
+    fwrite(bitmap, (size_t) bitmap_length, 1, file);
+    fclose(file);
 }
 
 #endif

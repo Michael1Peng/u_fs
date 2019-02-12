@@ -114,7 +114,7 @@ static int u_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     get_directory_entry(u_fs_file_directory.nStartBlock, &directory_entry);
 
     for (int i = 0; i < MAX_FILES_IN_DIRECTORY; ++i) {
-        if (strcmp(directory_entry.u_fs_file_directory_list[i].fname, "") == 0) {
+        if (strcmp(directory_entry.u_fs_file_directory_list[i].fname, "") != 0) {
             filler(buf, directory_entry.u_fs_file_directory_list[i].fname, NULL, 0, 0);
         }
     }
@@ -122,7 +122,7 @@ static int u_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     while (directory_entry.nNextBlock != 0) {
         get_directory_entry(directory_entry.nNextBlock, &directory_entry);
         for (int i = 0; i < MAX_FILES_IN_DIRECTORY; ++i) {
-            if (strcmp(directory_entry.u_fs_file_directory_list[i].fname, "") == 0) {
+            if (strcmp(directory_entry.u_fs_file_directory_list[i].fname, "") != 0) {
                 filler(buf, directory_entry.u_fs_file_directory_list[i].fname, NULL, 0, 0);
             }
         }
@@ -228,12 +228,104 @@ static int u_fs_mkdir(const char *path, mode_t mode) {
 
     struct Directory_entry directory_entry;
     directory_entry.numbers = 0;
+    for (int i = 0; i < MAX_FILES_IN_DIRECTORY; i++) {
+        strcpy(directory_entry.u_fs_file_directory_list[i].fname, "");
+    }
     directory_entry.nNextBlock = 0;
     write_directory_entry(directory_entry_location, &directory_entry);
 
     return 0;
 }
 
+static int u_fs_rmdir(const char *path) {
+    (void) path;
+
+    char directoryname[MAX_FILENAME + 1];
+    char filename[MAX_FILENAME + 1];
+    char extension[MAX_EXTENSION + 1];
+    memset(directoryname, 0, MAX_FILENAME + 1);
+    memset(filename, 0, MAX_FILENAME + 1);
+    memset(extension, 0, MAX_EXTENSION + 1);
+
+    sscanf(path, "/%[^/]/%[^.].%s", directoryname, filename, extension);
+
+    if (strcmp(filename, "") != 0 || strcmp(extension, "") != 0) {
+        printf("filename or extension is not empty\n");
+        return -ENOTDIR;
+    }
+
+    long location_directory = u_fs_find_directory(directoryname);
+    if (location_directory == 0) {
+        return -ENOENT;
+    }
+    printf("file_directory_location:%li\n", location_directory);
+
+    struct u_fs_File_directory u_fs_file_directory;
+    get_u_fs_file_directory(location_directory, &u_fs_file_directory);
+    struct Directory_entry directory_entry;
+    get_directory_entry(u_fs_file_directory.nStartBlock, &directory_entry);
+    printf("directory_entry_location:%li\n", u_fs_file_directory.nStartBlock);
+
+
+    for (int i = 0; i < MAX_FILES_IN_DIRECTORY; ++i) {
+        if (strcmp(directory_entry.u_fs_file_directory_list[i].fname, "") != 0) {
+            return -ENOTEMPTY;
+        }
+    }
+
+    while (directory_entry.nNextBlock != 0) {
+        get_directory_entry(directory_entry.nNextBlock, &directory_entry);
+        for (int i = 0; i < MAX_FILES_IN_DIRECTORY; ++i) {
+            if (strcmp(directory_entry.u_fs_file_directory_list[i].fname, "\n") != 0) {
+                return -ENOTEMPTY;
+            }
+        }
+    }
+
+//    检查完，可以删除
+    struct Sb sb;
+    get_sb(0, &sb);
+
+    struct Root_directory root_directory;
+    if (!get_root_directory(sb.first_blk, &root_directory)) {
+        return -ENOENT;
+    }
+
+    int dir_in_root_directory_flag = 0;
+    for (int i = 0; i < MAX_DIRS_IN_ROOT; i++) {
+        printf("%d name:%s %s\n", i,root_directory.directories[i].directory_name, directoryname);
+        if (strcmp(root_directory.directories[i].directory_name, directoryname) == 0) {
+            printf("%d name:%s\n", i, directoryname);
+            strcpy(root_directory.directories[i].directory_name, "");
+            mark_block_free(root_directory.directories[i].nStartBlock);
+            root_directory.directories[i].nStartBlock = 0;
+            dir_in_root_directory_flag = 1;
+            write_root_directory(sb.first_blk, &root_directory);
+            break;
+        }
+    }
+    while (root_directory.nNextBlock != 0 || dir_in_root_directory_flag == 0) {
+        get_root_directory(root_directory.nNextBlock, &root_directory);
+        for (int i = 0; i < MAX_DIRS_IN_ROOT; i++) {
+            if (strcmp(root_directory.directories[i].directory_name, directoryname) == 0) {
+                strcpy(root_directory.directories[i].directory_name, "");
+                mark_block_free(root_directory.directories[i].nStartBlock);
+                root_directory.directories[i].nStartBlock = 0;
+                dir_in_root_directory_flag = 1;
+                write_root_directory(sb.first_blk, &root_directory);
+                break;
+            }
+        }
+    }
+
+    mark_block_free(u_fs_file_directory.nStartBlock);
+    get_directory_entry(u_fs_file_directory.nStartBlock, &directory_entry);
+    while (directory_entry.nNextBlock != 0) {
+        mark_block_free(directory_entry.nNextBlock);
+        get_directory_entry(directory_entry.nNextBlock, &directory_entry);
+    }
+    return 0;
+}
 
 static int u_fs_read(const char *path, char *buf, size_t size, off_t offset,
                      struct fuse_file_info *fi) {
@@ -296,6 +388,7 @@ static struct fuse_operations u_fs_operations = {
         .getattr=u_fs_getattr,
         .readdir=u_fs_readdir,
         .mkdir=u_fs_mkdir,
+        .rmdir=u_fs_rmdir,
         .read=u_fs_read,
 };
 
