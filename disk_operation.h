@@ -8,7 +8,6 @@ static long u_fs_find_directory(char *directoryname) {
         return -1;
     }
 
-    printf("Open disk.\n");
     struct Sb sb;
 
     int read_disk = (int) fread((void *) &sb, sizeof(struct Sb), 1, disk);
@@ -39,7 +38,7 @@ static long u_fs_find_directory(char *directoryname) {
     return 0;
 }
 
-static long u_fs_find_file(long directory_pos, char *filename) {
+static long u_fs_find_file(long directory_pos, char *filename, char *extension) {
     FILE *disk = fopen("/data/.disk", "rb");
     if (disk == NULL) {
         printf("fail to open disk.\n");
@@ -54,7 +53,8 @@ static long u_fs_find_file(long directory_pos, char *filename) {
     fread((void *) &directory_entry, sizeof(struct Directory_entry), 1, disk);
 
     for (int i = 0; i < MAX_FILES_IN_DIRECTORY; ++i) {
-        if (strcmp(filename, directory_entry.u_fs_file_directory_list[i].fname) == 0) {
+        if (strcmp(filename, directory_entry.u_fs_file_directory_list[i].fname) == 0 &&
+            strcmp(extension, directory_entry.u_fs_file_directory_list[i].fext) == 0) {
             fclose(disk);
             return directory_entry.u_fs_file_directory_list[i].nStartBlock;
         }
@@ -64,7 +64,8 @@ static long u_fs_find_file(long directory_pos, char *filename) {
         fseek(disk, directory_entry.nNextBlock * BLOCK_SIZE, SEEK_SET);
         fread((void *) &directory_entry, sizeof(struct Directory_entry), 1, disk);
         for (int i = 0; i < MAX_FILES_IN_DIRECTORY; ++i) {
-            if (strcmp(filename, directory_entry.u_fs_file_directory_list[i].fname) == 0) {
+            if (strcmp(filename, directory_entry.u_fs_file_directory_list[i].fname) == 0 &&
+                strcmp(extension, directory_entry.u_fs_file_directory_list[i].fext) == 0) {
                 fclose(disk);
                 return directory_entry.u_fs_file_directory_list[i].nStartBlock;
             }
@@ -117,7 +118,8 @@ int get_root_directory(long location_root_directory, struct Root_directory *root
 }
 
 int
-get_u_fs_file_directory(long location_u_fs_file_directory, struct u_fs_File_directory *u_fs_file_directory_receiver) {
+get_u_fs_file_directory(long location_u_fs_file_directory,
+                        struct u_fs_File_directory *u_fs_file_directory_receiver) {
     FILE *disk = fopen("/data/.disk", "rb+");
     if (disk == NULL) {
         printf("fail to open disk.\n");
