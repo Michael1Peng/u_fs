@@ -48,4 +48,7 @@ struct u_fs_Disk_block {
     char data[MAX_DATA_IN_BLOCK];// And all the rest of the space in the block can be used for actual data storage.
 };
 
+struct u_fs_Disk_block new_disk_block(){
+
+}
 #endif

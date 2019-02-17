@@ -481,6 +481,75 @@ static int u_fs_write(const char *path, const char *buf, size_t size, off_t offs
     printf("It's write.\n");
 
     sscanf(path, "/%[^/]/%[^.].%s", directoryname, filename, extension);
+
+    long location_directory = u_fs_find_directory(directoryname);
+    if (location_directory == 0) {
+        return -ENOENT;
+    }
+
+    long location_file = u_fs_find_file(location_directory, filename, extension);
+    if (location_file == 0) {
+        return -ENOENT;
+    }
+
+    struct u_fs_File_directory u_fs_file_directory;
+    get_u_fs_file_directory(location_file, &u_fs_file_directory);
+
+    if (offset > u_fs_file_directory.fsize) {
+        return -EFBIG;
+    }
+    u_fs_file_directory.fsize = offset + size;
+    write_u_fs_file_directory(location_file, &u_fs_file_directory);
+
+    struct u_fs_Disk_block u_fs_disk_block;
+    get_u_fs_disk_block(u_fs_file_directory.nStartBlock, &u_fs_disk_block);
+
+    long location_disk_block;
+    location_disk_block = u_fs_file_directory.nStartBlock;
+    int offset_remainder = (int) offset;
+    while (offset_remainder >= MAX_DATA_IN_BLOCK) {
+        offset_remainder -= MAX_DATA_IN_BLOCK;
+        location_disk_block = u_fs_disk_block.nNextBlock;
+        if (get_u_fs_disk_block(u_fs_disk_block.nNextBlock, &u_fs_disk_block)) {
+            continue;
+        } else {
+            printf("The offset is out of range.\n");
+            return -1;
+        }
+    }
+
+    int i;
+    for (i = 0; i < size; i++) {
+        if ((i + offset_remainder) % MAX_DATA_IN_BLOCK == 0 && i != 0) {
+            if (u_fs_disk_block.nNextBlock == 0) {
+                long disk_block_new_block_location = find_free_block();
+                if (disk_block_new_block_location == -1) {
+                    printf("There is no free blocks.\n");
+                    return -1;
+                }
+                u_fs_disk_block.nNextBlock = disk_block_new_block_location;
+                write_u_fs_disk_block(location_disk_block, &u_fs_disk_block);
+                location_disk_block = disk_block_new_block_location;
+                struct u_fs_Disk_block u_fs_disk_block_new;
+                u_fs_disk_block = u_fs_disk_block_new;
+            } else {
+                location_disk_block = u_fs_disk_block.nNextBlock;
+                get_u_fs_disk_block(location_disk_block, &u_fs_disk_block);
+            }
+        }
+        if (i + offset > u_fs_file_directory.fsize) {
+            break;
+        }
+        u_fs_disk_block.data[(i + offset_remainder) % MAX_DATA_IN_BLOCK] = buf[i];
+    }
+
+    write_u_fs_disk_block(location_disk_block, &u_fs_disk_block);
+    while (u_fs_disk_block.nNextBlock != 0) {
+        location_disk_block = u_fs_disk_block.nNextBlock;
+        get_u_fs_disk_block(location_disk_block, &u_fs_disk_block);
+        mark_block_free(location_disk_block);
+    }
+    return (int) size;
 }
 
 static int u_fs_read(const char *path, char *buf, size_t size, off_t offset,
