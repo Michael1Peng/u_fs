@@ -51,12 +51,14 @@ static int u_fs_getattr(const char *path, struct stat *stbuf,
             size_t fsize = 0;
             long location_file = u_fs_find_file(location_directory, filename, extension);
             printf("We are reading the file:%s in the directory:%s.\n", filename, directoryname);
+            struct u_fs_File_directory u_fs_file_directory;
+            get_u_fs_file_directory(location_file, &u_fs_file_directory);
             if (location_file == 0) {
                 return -ENOENT;
             }
             stbuf->st_mode = S_IFREG | 0666;
             stbuf->st_nlink = 1;
-            stbuf->st_size = fsize;
+            stbuf->st_size = (off_t) u_fs_file_directory.fsize;
             return 0;
         }
     }
@@ -466,7 +468,6 @@ static int u_fs_mknod(const char *path, mode_t mode, dev_t dev) {
 
     struct u_fs_Disk_block u_fs_disk_block;
     write_u_fs_disk_block(disk_block_location, &u_fs_disk_block);
-    printf("0\n");
     return 0;
 }
 
@@ -543,7 +544,7 @@ static int u_fs_write(const char *path, const char *buf, size_t size, off_t offs
         if (i + offset > u_fs_file_directory.fsize) {
             break;
         }
-        u_fs_disk_block.data[(i + offset_remainder) % MAX_DATA_IN_BLOCK] = buf[i];
+        u_fs_disk_block.data[(i + offset_remainder) % (int) (MAX_DATA_IN_BLOCK)] = buf[i];
     }
 
     write_u_fs_disk_block(location_disk_block, &u_fs_disk_block);
@@ -601,6 +602,7 @@ static int u_fs_read(const char *path, char *buf, size_t size, off_t offset,
     }
 
     int i;
+    size = u_fs_file_directory.fsize - offset;
     for (i = 0; i < size; i++) {
         if ((i + offset_remainder) % MAX_DATA_IN_BLOCK == 0 && i != 0) {
             get_u_fs_disk_block(u_fs_disk_block.nNextBlock, &u_fs_disk_block);
@@ -608,8 +610,9 @@ static int u_fs_read(const char *path, char *buf, size_t size, off_t offset,
         if (i + offset > u_fs_file_directory.fsize) {
             break;
         }
-        buf[i] = u_fs_disk_block.data[(i + offset_remainder) % MAX_DATA_IN_BLOCK];
+        buf[i] = u_fs_disk_block.data[(i + offset_remainder) % (int) (MAX_DATA_IN_BLOCK)];
     }
+
     return i;
 }
 
@@ -619,7 +622,7 @@ static struct fuse_operations u_fs_operations = {
         .mkdir=u_fs_mkdir,
         .rmdir=u_fs_rmdir,
         .mknod=u_fs_mknod,
-//        .write=u_fs_write,
+        .write=u_fs_write,
         .read=u_fs_read,
 };
 
