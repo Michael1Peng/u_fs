@@ -37,6 +37,7 @@ static int u_fs_getattr(const char *path, struct stat *stbuf,
         return 0;
     } else {
         sscanf(path, "/%[^/]/%[^.].%s", directoryname, filename, extension);
+        printf("directoryname:%s filename:%s extension:%s\n", directoryname, filename, extension);
         long location_directory = u_fs_find_directory(directoryname);
         if (location_directory == 0) {
             return -ENOENT;
@@ -351,9 +352,10 @@ static int u_fs_mknod(const char *path, mode_t mode, dev_t dev) {
     memset(filename, 0, 2 * (MAX_FILENAME + 1));
     memset(extension, 0, 2 * (MAX_EXTENSION + 1));
 
+    printf("It's mknod.\n");
     sscanf(path, "/%[^/]/%[^.].%s", directoryname, filename, extension);
 
-    printf("%s %s %s\n", directoryname, filename, extension);
+    printf("directoryname:%s filename:%s extension:%s\n", directoryname, filename, extension);
 
 //    检查文件名和路径名是否合格？
     if (strlen(filename) > 8 || strlen(filename) < 0 || strlen(extension) > 3 || strlen(extension) < 0) {
@@ -464,6 +466,7 @@ static int u_fs_mknod(const char *path, mode_t mode, dev_t dev) {
 
     struct u_fs_Disk_block u_fs_disk_block;
     write_u_fs_disk_block(disk_block_location, &u_fs_disk_block);
+    printf("0\n");
     return 0;
 }
 
@@ -556,6 +559,7 @@ static int u_fs_read(const char *path, char *buf, size_t size, off_t offset,
                      struct fuse_file_info *fi) {
     (void) fi;
 
+    printf("It's read.\n");
     char directoryname[MAX_FILENAME + 1];
     char filename[MAX_FILENAME + 1];
     char extension[MAX_EXTENSION + 1];
@@ -615,7 +619,7 @@ static struct fuse_operations u_fs_operations = {
         .mkdir=u_fs_mkdir,
         .rmdir=u_fs_rmdir,
         .mknod=u_fs_mknod,
-        .write=u_fs_write,
+//        .write=u_fs_write,
         .read=u_fs_read,
 };
 
