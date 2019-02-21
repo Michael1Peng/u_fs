@@ -17,10 +17,12 @@
 #include "u_fs_structs.h"
 #include "disk_operation.h"
 
+//获取文件或文件夹属性
 static int u_fs_getattr(const char *path, struct stat *stbuf,
                         struct fuse_file_info *fi) {
     (void) fi;
 
+//  处理对应路径
     memset(stbuf, 0, sizeof(struct stat));
     char directoryname[MAX_FILENAME + 1];
     char filename[MAX_FILENAME + 1];
@@ -30,13 +32,16 @@ static int u_fs_getattr(const char *path, struct stat *stbuf,
     memset(extension, 0, MAX_EXTENSION + 1);
     printf("It's stat.\n");
 
+//    搜索根目录的属性
     if (strcmp(path, "/") == 0) {
         printf("We are reading the root directory.\n");
         stbuf->st_mode = S_IFDIR | 0755;
         stbuf->st_nlink = 2;
         return 0;
     } else {
+//        搜索文件夹属性
         sscanf(path, "/%[^/]/%[^.].%s", directoryname, filename, extension);
+//        搜索对应文件夹是否存在
         printf("directoryname:%s filename:%s extension:%s\n", directoryname, filename, extension);
         long location_directory = u_fs_find_directory(directoryname);
         if (location_directory == 0) {
@@ -48,7 +53,9 @@ static int u_fs_getattr(const char *path, struct stat *stbuf,
             stbuf->st_nlink = 2;
             return 0;
         } else {
+//            搜索文件属性
             size_t fsize = 0;
+//            搜索对应文件是否存在
             long location_file = u_fs_find_file(location_directory, filename, extension);
             printf("We are reading the file:%s in the directory:%s.\n", filename, directoryname);
             struct u_fs_File_directory u_fs_file_directory;
@@ -64,6 +71,7 @@ static int u_fs_getattr(const char *path, struct stat *stbuf,
     }
 }
 
+//获取文件夹下的文件目录信息
 static int u_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
                         off_t offset, struct fuse_file_info *fi,
                         enum fuse_readdir_flags flags) {
@@ -71,6 +79,7 @@ static int u_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     (void) fi;
     (void) flags;
 
+//    处理对应路径
     char directoryname[MAX_FILENAME + 1];
     char filename[MAX_FILENAME + 1];
     char extension[MAX_EXTENSION + 1];
@@ -81,23 +90,28 @@ static int u_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     printf("It's ls.\n");
     sscanf(path, "/%[^/]/%[^.].%s", directoryname, filename, extension);
 
+//    获取根目录下的文件目录信息
     if (strcmp(path, "/") == 0) {
         printf("We are reading the root directory.\n");
         filler(buf, ".", NULL, 0, 0);
         filler(buf, "..", NULL, 0, 0);
 
+//        获得对应的Sb 和Root_directory
         struct Sb sb;
-
         get_sb(0, &sb);
+
         struct Root_directory root_directory;
         if (!get_root_directory(sb.first_blk, &root_directory)) {
             return -ENOENT;
         }
+
+//        搜索Root_directory 下面的文件夹目录
         for (int i = 0; i < MAX_DIRS_IN_ROOT; i++) {
             if (strcmp(root_directory.directories[i].directory_name, "") != 0) {
                 filler(buf, root_directory.directories[i].directory_name, NULL, 0, 0);
             }
         }
+//        搜索还有是否下个Root_directory 块
         while (root_directory.nNextBlock != 0) {
             get_root_directory(root_directory.nNextBlock, &root_directory);
             for (int i = 0; i < MAX_DIRS_IN_ROOT; i++) {
@@ -109,6 +123,8 @@ static int u_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
         return 0;
     }
 
+//    获取对应文件夹下的文件目录信息
+//    搜索文件夹是否存在？
     printf("We are reading the directory:%s.\n", directoryname);
     long location_directory = u_fs_find_directory(directoryname);
     if (location_directory == 0) {
@@ -116,12 +132,14 @@ static int u_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     }
     printf("Found the location of the directory:%s location:%li\n", directoryname, location_directory);
 
+//    获得对应的u_fs_File_directory 和Directory_entry
     struct u_fs_File_directory u_fs_file_directory;
     get_u_fs_file_directory(location_directory, &u_fs_file_directory);
     struct Directory_entry directory_entry;
     get_directory_entry(u_fs_file_directory.nStartBlock, &directory_entry);
     char filename_and_extension[80];
 
+//    搜索Directory_entry 下面的文件夹目录
     for (int i = 0; i < MAX_FILES_IN_DIRECTORY; ++i) {
         if (strcmp(directory_entry.u_fs_file_directory_list[i].fname, "") != 0) {
             strcpy(filename_and_extension, directory_entry.u_fs_file_directory_list[i].fname);
@@ -132,7 +150,7 @@ static int u_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
             filler(buf, filename_and_extension, NULL, 0, 0);
         }
     }
-
+//    搜索还有是否下个Directory_entry 块
     while (directory_entry.nNextBlock != 0) {
         get_directory_entry(directory_entry.nNextBlock, &directory_entry);
         for (int i = 0; i < MAX_FILES_IN_DIRECTORY; ++i) {
@@ -150,10 +168,12 @@ static int u_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
 }
 
+//创建文件夹
 static int u_fs_mkdir(const char *path, mode_t mode) {
     (void) path;
     (void) mode;
 
+//    处理对应路径
     char directoryname[2 * (MAX_FILENAME + 1)];
     char filename[2 * (MAX_FILENAME + 1)];
     char extension[2 * (MAX_EXTENSION + 1)];
@@ -163,6 +183,7 @@ static int u_fs_mkdir(const char *path, mode_t mode) {
 
     sscanf(path, "/%[^/]/%[^.].%s", directoryname, filename, extension);
 
+//    判断对应路径名是否合法
     if (strcmp(filename, "") != 0 || strcmp(extension, "") != 0) {
         printf("filename or extension is not empty\n");
         return -ENAMETOOLONG;
@@ -177,6 +198,7 @@ static int u_fs_mkdir(const char *path, mode_t mode) {
         printf("The length of directory name is incorrect. It should be less than 8 and more than 0.\n");
     }
 
+//    获取新的硬盘块
     long file_directory_location = find_free_block();
     long directory_entry_location = find_free_block();
 
@@ -185,6 +207,7 @@ static int u_fs_mkdir(const char *path, mode_t mode) {
         return -1;
     }
 
+//    获得对应的Sb 和Root_directory
     struct Sb sb;
     get_sb(0, &sb);
 
@@ -195,6 +218,7 @@ static int u_fs_mkdir(const char *path, mode_t mode) {
 
     int store_flag = 0;
 
+//    搜索Root_directory 下面的文件夹目录，判断是否有空的
     for (int i = 0; i < MAX_DIRS_IN_ROOT; i++) {
         if (strcmp(root_directory.directories[i].directory_name, "") == 0) {
             root_directory.numbers = root_directory.numbers + 1;
@@ -206,6 +230,7 @@ static int u_fs_mkdir(const char *path, mode_t mode) {
         }
     }
 
+//    如果没有，判断下一个Root_directory 块
     long root_directory_location = sb.first_blk;
     while (root_directory.nNextBlock != 0 && store_flag == 0) {
         root_directory_location = root_directory.nNextBlock;
@@ -222,6 +247,7 @@ static int u_fs_mkdir(const char *path, mode_t mode) {
         }
     }
 
+//    如果前面的Root_directory 块都没有，则创建新的Root_directory 块
     if (store_flag == 0) {
         long root_directory_location_new = find_free_block();
         if (root_directory_location_new == -1) {
@@ -239,6 +265,7 @@ static int u_fs_mkdir(const char *path, mode_t mode) {
         write_root_directory(root_directory_location_new, &root_directory_new);
     }
 
+//    将对应的u_fs_File_directory 和Directory_entry 放到对应的硬盘块
     struct u_fs_File_directory u_fs_file_directory;
     strncpy(u_fs_file_directory.fname, directoryname, 8);
     u_fs_file_directory.nStartBlock = directory_entry_location;
