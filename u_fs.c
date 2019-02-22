@@ -714,6 +714,8 @@ static int u_fs_unlink(const char *path) {
         if (strcmp(directory_entry.u_fs_file_directory_list[i].fname, filename) == 0 &&
             strcmp(directory_entry.u_fs_file_directory_list[i].fext, extension) == 0) {
             struct u_fs_File_directory u_fs_file_directory_new;
+            strcpy(u_fs_file_directory_new.fname, "");
+            strcpy(u_fs_file_directory_new.fext, "");
             directory_entry.u_fs_file_directory_list[i] = u_fs_file_directory_new;
             delete_flag = 1;
             write_directory_entry(location_directory_entry, &directory_entry);
@@ -726,6 +728,8 @@ static int u_fs_unlink(const char *path) {
             if (strcmp(directory_entry.u_fs_file_directory_list[i].fname, filename) == 0 &&
                 strcmp(directory_entry.u_fs_file_directory_list[i].fext, extension) == 0) {
                 struct u_fs_File_directory u_fs_file_directory_new;
+                strcpy(u_fs_file_directory_new.fname, "");
+                strcpy(u_fs_file_directory_new.fext, "");
                 directory_entry.u_fs_file_directory_list[i] = u_fs_file_directory_new;
                 delete_flag = 1;
                 write_directory_entry(location_directory_entry, &directory_entry);
