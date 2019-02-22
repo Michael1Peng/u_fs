@@ -541,15 +541,18 @@ static int u_fs_write(const char *path, const char *buf, size_t size, off_t offs
         return -ENOENT;
     }
 
+//    找到对应的u_fs_File_directory
     struct u_fs_File_directory u_fs_file_directory;
     get_u_fs_file_directory(location_file, &u_fs_file_directory);
 
+//    处理偏移
     if (offset > u_fs_file_directory.fsize) {
         return -EFBIG;
     }
     u_fs_file_directory.fsize = offset + size;
     write_u_fs_file_directory(location_file, &u_fs_file_directory);
 
+//    找到储存内容的u_fs_Disk_block
     struct u_fs_Disk_block u_fs_disk_block;
     get_u_fs_disk_block(u_fs_file_directory.nStartBlock, &u_fs_disk_block);
 
@@ -567,6 +570,7 @@ static int u_fs_write(const char *path, const char *buf, size_t size, off_t offs
         }
     }
 
+//    开始写文件
     int i;
     for (i = 0; i < size; i++) {
         if ((i + offset_remainder) % MAX_DATA_IN_BLOCK == 0 && i != 0) {
@@ -601,10 +605,12 @@ static int u_fs_write(const char *path, const char *buf, size_t size, off_t offs
     return (int) size;
 }
 
+//读文件
 static int u_fs_read(const char *path, char *buf, size_t size, off_t offset,
                      struct fuse_file_info *fi) {
     (void) fi;
 
+//    处理对应路径
     printf("It's read.\n");
     char directoryname[MAX_FILENAME + 1];
     char filename[MAX_FILENAME + 1];
@@ -615,6 +621,7 @@ static int u_fs_read(const char *path, char *buf, size_t size, off_t offset,
 
     sscanf(path, "/%[^/]/%[^.].%s", directoryname, filename, extension);
 
+//    找到对应的文件
     long location_directory = u_fs_find_directory(directoryname);
     if (location_directory == 0) {
         return -ENOENT;
@@ -628,10 +635,12 @@ static int u_fs_read(const char *path, char *buf, size_t size, off_t offset,
     struct u_fs_File_directory u_fs_file_directory;
     get_u_fs_file_directory(location_file, &u_fs_file_directory);
 
+//    处理偏移
     if (offset > u_fs_file_directory.fsize) {
         return -EFBIG;
     }
 
+//    找到储存内容的u_fs_Disk_block
     struct u_fs_Disk_block u_fs_disk_block;
     get_u_fs_disk_block(u_fs_file_directory.nStartBlock, &u_fs_disk_block);
 
@@ -646,6 +655,7 @@ static int u_fs_read(const char *path, char *buf, size_t size, off_t offset,
         }
     }
 
+//    开始读文件
     int i;
     size = u_fs_file_directory.fsize - offset;
     for (i = 0; i < size; i++) {
@@ -661,6 +671,85 @@ static int u_fs_read(const char *path, char *buf, size_t size, off_t offset,
     return i;
 }
 
+//删除文件
+static int u_fs_unlink(const char *path) {
+    (void) path;
+
+    printf("It's unlink.\n");
+//    处理对应路径
+    char directoryname[2 * (MAX_FILENAME + 1)];
+    char filename[2 * (MAX_FILENAME + 1)];
+    char extension[2 * (MAX_EXTENSION + 1)];
+    memset(directoryname, 0, 2 * (MAX_FILENAME + 1));
+    memset(filename, 0, 2 * (MAX_FILENAME + 1));
+    memset(extension, 0, 2 * (MAX_EXTENSION + 1));
+
+    sscanf(path, "/%[^/]/%[^.].%s", directoryname, filename, extension);
+
+//    检查文件名和路径名是否合格？
+    if (strcmp(filename, "") == 0) {
+        return -EISDIR;
+    }
+
+//    找到对应的文件夹和文件
+    long location_directory = u_fs_find_directory(directoryname);
+    if (location_directory == 0) {
+        return -ENOENT;
+    }
+
+    long location_file = u_fs_find_file(location_directory, filename, extension);
+    if (location_file == 0) {
+        return -ENOENT;
+    }
+
+//    先删除目录下的文件记录
+    int delete_flag = 0;
+    struct u_fs_File_directory u_fs_file_directory;
+    get_u_fs_file_directory(location_directory, &u_fs_file_directory);
+    long location_directory_entry = u_fs_file_directory.nStartBlock;
+    struct Directory_entry directory_entry;
+    get_directory_entry(location_directory_entry, &directory_entry);
+
+    for (int i = 0; i < MAX_FILES_IN_DIRECTORY; ++i) {
+        if (strcmp(directory_entry.u_fs_file_directory_list[i].fname, filename) == 0 &&
+            strcmp(directory_entry.u_fs_file_directory_list[i].fext, extension) == 0) {
+            struct u_fs_File_directory u_fs_file_directory_new;
+            directory_entry.u_fs_file_directory_list[i] = u_fs_file_directory_new;
+            delete_flag = 1;
+            write_directory_entry(location_directory_entry, &directory_entry);
+        }
+    }
+
+    while (directory_entry.nNextBlock != 0 && delete_flag == 0) {
+        get_directory_entry(directory_entry.nNextBlock, &directory_entry);
+        for (int i = 0; i < MAX_FILES_IN_DIRECTORY; ++i) {
+            if (strcmp(directory_entry.u_fs_file_directory_list[i].fname, filename) == 0 &&
+                strcmp(directory_entry.u_fs_file_directory_list[i].fext, extension) == 0) {
+                struct u_fs_File_directory u_fs_file_directory_new;
+                directory_entry.u_fs_file_directory_list[i] = u_fs_file_directory_new;
+                delete_flag = 1;
+                write_directory_entry(location_directory_entry, &directory_entry);
+            }
+        }
+    }
+
+    if (delete_flag == 0) {
+        return -ENOENT;
+    }
+
+//    删除文件对应的硬盘块
+    mark_block_free(location_file);
+    get_u_fs_file_directory(location_file, &u_fs_file_directory);
+    mark_block_free(u_fs_file_directory.nStartBlock);
+    struct u_fs_Disk_block u_fs_disk_block;
+    get_u_fs_disk_block(u_fs_file_directory.nStartBlock, &u_fs_disk_block);
+
+    while (u_fs_disk_block.nNextBlock != 0) {
+        mark_block_free(u_fs_disk_block.nNextBlock);
+        get_u_fs_disk_block(u_fs_disk_block.nNextBlock, &u_fs_disk_block);
+    }
+}
+
 static struct fuse_operations u_fs_operations = {
         .getattr=u_fs_getattr,
         .readdir=u_fs_readdir,
@@ -669,6 +758,7 @@ static struct fuse_operations u_fs_operations = {
         .mknod=u_fs_mknod,
         .write=u_fs_write,
         .read=u_fs_read,
+        .unlink=u_fs_unlink,
 };
 
 int main(int argc, char *argv[]) {
