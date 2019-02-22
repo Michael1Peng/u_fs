@@ -173,6 +173,7 @@ static int u_fs_mkdir(const char *path, mode_t mode) {
     (void) path;
     (void) mode;
 
+    printf("It's mkdir.\n");
 //    处理对应路径
     char directoryname[2 * (MAX_FILENAME + 1)];
     char filename[2 * (MAX_FILENAME + 1)];
@@ -283,9 +284,12 @@ static int u_fs_mkdir(const char *path, mode_t mode) {
     return 0;
 }
 
+//删除文件夹
 static int u_fs_rmdir(const char *path) {
     (void) path;
 
+    printf("It's rmdir.\n");
+//    处理对应路径
     char directoryname[MAX_FILENAME + 1];
     char filename[MAX_FILENAME + 1];
     char extension[MAX_EXTENSION + 1];
@@ -295,21 +299,25 @@ static int u_fs_rmdir(const char *path) {
 
     sscanf(path, "/%[^/]/%[^.].%s", directoryname, filename, extension);
 
+//    判断对应路径名是否合法
     if (strcmp(filename, "") != 0 || strcmp(extension, "") != 0) {
         printf("filename or extension is not empty\n");
         return -ENOTDIR;
     }
 
+//    搜索文件夹是否存在？
     long location_directory = u_fs_find_directory(directoryname);
     if (location_directory == 0) {
         return -ENOENT;
     }
 
+//    获得对应的u_fs_File_directory 和Directory_entry
     struct u_fs_File_directory u_fs_file_directory;
     get_u_fs_file_directory(location_directory, &u_fs_file_directory);
     struct Directory_entry directory_entry;
     get_directory_entry(u_fs_file_directory.nStartBlock, &directory_entry);
 
+//    检查文件夹是否为空
     for (int i = 0; i < MAX_FILES_IN_DIRECTORY; ++i) {
         if (strcmp(directory_entry.u_fs_file_directory_list[i].fname, "") != 0) {
             return -ENOTEMPTY;
@@ -334,11 +342,10 @@ static int u_fs_rmdir(const char *path) {
         return -ENOENT;
     }
 
+//    找到对应的文件夹
     int dir_in_root_directory_flag = 0;
     for (int i = 0; i < MAX_DIRS_IN_ROOT; i++) {
-        printf("%d name:%s %s\n", i, root_directory.directories[i].directory_name, directoryname);
         if (strcmp(root_directory.directories[i].directory_name, directoryname) == 0) {
-            printf("%d name:%s\n", i, directoryname);
             strcpy(root_directory.directories[i].directory_name, "");
             mark_block_free(root_directory.directories[i].nStartBlock);
             root_directory.directories[i].nStartBlock = 0;
@@ -361,6 +368,7 @@ static int u_fs_rmdir(const char *path) {
         }
     }
 
+//    删除对应的块
     mark_block_free(u_fs_file_directory.nStartBlock);
     get_directory_entry(u_fs_file_directory.nStartBlock, &directory_entry);
     while (directory_entry.nNextBlock != 0) {
@@ -370,10 +378,12 @@ static int u_fs_rmdir(const char *path) {
     return 0;
 }
 
+//创建文件
 static int u_fs_mknod(const char *path, mode_t mode, dev_t dev) {
     (void) mode;
     (void) dev;
 
+//    处理对应路径
     char directoryname[2 * (MAX_FILENAME + 1)];
     char filename[2 * (MAX_FILENAME + 1)];
     char extension[2 * (MAX_EXTENSION + 1)];
@@ -403,6 +413,7 @@ static int u_fs_mknod(const char *path, mode_t mode, dev_t dev) {
         return -EPERM;
     }
 
+//    寻找文件名是否存在
     long location_directory = u_fs_find_directory(directoryname);
     struct u_fs_File_directory u_fs_file_directory;
     get_u_fs_file_directory(location_directory, &u_fs_file_directory);
@@ -427,6 +438,7 @@ static int u_fs_mknod(const char *path, mode_t mode, dev_t dev) {
         }
     }
 
+//    获取新的硬盘块
     long file_directory_location = find_free_block();
     long disk_block_location = find_free_block();
 
@@ -435,6 +447,7 @@ static int u_fs_mknod(const char *path, mode_t mode, dev_t dev) {
         return -1;
     }
 
+//    搜索Directory_entry 下面的文件夹目录，判断是否有空的
     get_directory_entry(location_directory_entry, &directory_entry);
     int store_flag = 0;
     for (int i = 0; i < MAX_FILES_IN_DIRECTORY; ++i) {
@@ -467,6 +480,7 @@ static int u_fs_mknod(const char *path, mode_t mode, dev_t dev) {
         }
     }
 
+//    如果前面的Directory_entry 块都没有，则创建新的Directory_entry 块
     if (store_flag == 0) {
         long location_directory_entry_new = find_free_block();
         if (location_directory_entry_new == -1) {
@@ -486,6 +500,7 @@ static int u_fs_mknod(const char *path, mode_t mode, dev_t dev) {
         write_directory_entry(location_directory_entry_new, &directory_entry_new);
     }
 
+//    将对应的u_fs_File_directory 和u_fs_Disk_block 放到对应的硬盘块
     struct u_fs_File_directory u_fs_file;
     strcpy(u_fs_file.fname, filename);
     strcpy(u_fs_file.fext, extension);
@@ -498,10 +513,12 @@ static int u_fs_mknod(const char *path, mode_t mode, dev_t dev) {
     return 0;
 }
 
+//写文件
 static int u_fs_write(const char *path, const char *buf, size_t size, off_t offset,
                       struct fuse_file_info *fi) {
     (void) fi;
 
+//    处理对应路径
     char directoryname[MAX_FILENAME + 1];
     char filename[MAX_FILENAME + 1];
     char extension[MAX_EXTENSION + 1];
@@ -513,6 +530,7 @@ static int u_fs_write(const char *path, const char *buf, size_t size, off_t offs
 
     sscanf(path, "/%[^/]/%[^.].%s", directoryname, filename, extension);
 
+//    判断对应路径名是否合法
     long location_directory = u_fs_find_directory(directoryname);
     if (location_directory == 0) {
         return -ENOENT;
