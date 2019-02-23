@@ -23,6 +23,7 @@ void Init() {
 
     struct Sb *sb = malloc(sizeof(struct Sb));
     sb->first_blk = 1;
+    sb->bitmap = 5000000;
     fwrite((void *) sb, sizeof(struct Sb), 1, file);
 
     struct Root_directory *root_directory = malloc(sizeof(struct Root_directory));

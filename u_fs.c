@@ -549,7 +549,12 @@ static int u_fs_write(const char *path, const char *buf, size_t size, off_t offs
     if (offset > u_fs_file_directory.fsize) {
         return -EFBIG;
     }
+    struct Sb sb;
+    get_sb(0, &sb);
+    sb.fs_size = sb.fs_size - u_fs_file_directory.fsize;
     u_fs_file_directory.fsize = offset + size;
+    sb.fs_size = sb.fs_size + offset + size;
+    write_sb(0, &sb);
     write_u_fs_file_directory(location_file, &u_fs_file_directory);
 
 //    找到储存内容的u_fs_Disk_block
