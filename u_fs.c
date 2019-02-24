@@ -57,12 +57,12 @@ static int u_fs_getattr(const char *path, struct stat *stbuf,
             size_t fsize = 0;
 //            搜索对应文件是否存在
             long location_file = u_fs_find_file(location_directory, filename, extension);
-            printf("We are reading the file:%s in the directory:%s.\n", filename, directoryname);
-            struct u_fs_File_directory u_fs_file_directory;
-            get_u_fs_file_directory(location_file, &u_fs_file_directory);
             if (location_file == 0) {
                 return -ENOENT;
             }
+            printf("We are reading the file:%s in the directory:%s.\n", filename, directoryname);
+            struct u_fs_File_directory u_fs_file_directory;
+            get_u_fs_file_directory(location_file, &u_fs_file_directory);
             stbuf->st_mode = S_IFREG | 0666;
             stbuf->st_nlink = 1;
             stbuf->st_size = (off_t) u_fs_file_directory.fsize;
@@ -197,6 +197,7 @@ static int u_fs_mkdir(const char *path, mode_t mode) {
 
     if (strlen(directoryname) > 8 || strlen(directoryname) < 0) {
         printf("The length of directory name is incorrect. It should be less than 8 and more than 0.\n");
+        return -ENAMETOOLONG;
     }
 
 //    获取新的硬盘块
@@ -395,6 +396,7 @@ static int u_fs_mknod(const char *path, mode_t mode, dev_t dev) {
     sscanf(path, "/%[^/]/%[^.].%s", directoryname, filename, extension);
 
     printf("directoryname:%s filename:%s extension:%s\n", directoryname, filename, extension);
+    printf("%d \n", (int) strlen(filename));
 
 //    检查文件名和路径名是否合格？
     if (strlen(filename) > 8 || strlen(filename) < 0 || strlen(extension) > 3 || strlen(extension) < 0) {
