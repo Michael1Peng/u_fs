@@ -1,0 +1,46 @@
+首先创建文件夹，使文件系统获得读写文件的权限
+sudo -s
+cd /
+mkdir data
+chmod 777 data
+
+然后编译初始化文件
+gcc Initialize_.disk.c -o Initialize_.disk
+将文件系统初始化
+./Initialize_.disk
+
+然后编译文件系统：
+gcc -Wall u_fs.c `pkg-config fuse3 --cflags --libs` -o u_fs
+
+创建一个文件夹来作为挂载文件夹
+mkdir <需要挂载的文件夹>
+例如：
+mkdir testmount
+
+./u_fs <被挂载的文件夹>（./u_fs -f <被挂载的文件夹> 的话可以看得到调试信息）
+例如：
+./u_fs testmount
+
+获取当前文件夹或文件的具体属性
+stat <对应的路径名>
+
+获取当前目录下包含的子目录或者文件
+ls <对应的路径名>
+
+创建一个文件夹
+mkdir <文件夹对应的路径名>
+
+删除一个文件夹
+rmdir <文件夹对应的路径名>
+
+创建一个文件
+mknod <文件对应的路径名> p
+
+向文件写入数据
+echo "<需要输入的内容>" > <文件对应的路径名>
+
+从文件读取数据
+cat <文件对应的路径名>
+
+删除文件
+unlink <文件对应的路径名>
