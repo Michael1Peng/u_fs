@@ -66,6 +66,10 @@ static int hello_getattr(const char *path, struct stat *stbuf,
     (void) fi;
     int res = 0;
 
+    FILE *file = fopen("/data/.disk", "w");
+    if (file == NULL) {
+        printf("fail to  the file.\n");
+    }
     memset(stbuf, 0, sizeof(struct stat));
     if (strcmp(path, "/") == 0) {
         stbuf->st_mode = S_IFDIR | 0755;
